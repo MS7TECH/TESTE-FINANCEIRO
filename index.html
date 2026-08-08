@@ -78,7 +78,7 @@
         <div id="step-payment" class="hidden space-y-6">
             <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-2xl border border-purple-100/80 space-y-3 shadow-inner">
                 <div class="flex justify-between items-center text-sm text-gray-600 border-b border-purple-100 pb-2">
-                    <span>Responsável:</span>
+                    <span>Responsável / Aluna:</span>
                     <span id="resp-name" class="font-bold text-gray-800 text-base">Cliente</span>
                 </div>
                 <div class="flex justify-between items-center text-sm text-gray-600 border-b border-purple-100 pb-2">
@@ -143,12 +143,12 @@
             }
 
             try {
-                // ATENÇÃO: Verifique se o nome da sua tabela no Supabase é realmente 'faturas'
+                // CORRIGIDO: Busca na tabela correta 'alunos' do seu sistema
                 const { data, error } = await supabaseClient
-                    .from('faturas')
+                    .from('alunos')
                     .select('*')
                     .eq('resp_tel', phone)
-                    .maybeSingle(); // Usamos maybeSingle para não dar erro se não achar
+                    .maybeSingle();
 
                 if (error) {
                     console.error("Erro do Supabase:", error);
@@ -165,13 +165,16 @@
 
                 errorMsgContainer.classList.add('hidden');
                 
-                document.getElementById('resp-name').textContent = data.resp_nome || "Responsável";
-                if(data.valor) {
-                    document.getElementById('fatura-valor').textContent = `R$ ${Number(data.valor).toFixed(2).replace('.', ',')}`;
+                // Exibe o nome do responsável e da aluna de forma amigável
+                const nomeExibicao = data.resp_nome ? `${data.resp_nome} (${data.nome})` : data.nome;
+                document.getElementById('resp-name').textContent = nomeExibicao || "Cliente";
+
+                if(data.valor_mensalidade) {
+                    document.getElementById('fatura-valor').textContent = `R$ ${Number(data.valor_mensalidade).toFixed(2).replace('.', ',')}`;
                 }
 
                 const numeroZap = "5571982119267";
-                const textoMensagem = encodeURIComponent("Olá acabei de efetuar o pagamento!\nsegue o comprovante");
+                const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${data.nome}\nSegue o comprovante.`);
                 document.getElementById('whatsapp-btn').href = `https://wa.me/${numeroZap}?text=${textoMensagem}`;
 
                 document.getElementById('step-search').classList.add('hidden');
