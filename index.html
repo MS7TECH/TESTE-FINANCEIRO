@@ -156,21 +156,24 @@
                 formatado = `(${apenasNumeros.slice(0,2)}) ${apenasNumeros.slice(2,6)}-${apenasNumeros.slice(6)}`;
             }
 
-            // Variações extras para garantir que encontre independentemente de espaços ou traços salvos no banco
             const semDDI = apenasNumeros.startsWith("55") ? apenasNumeros.slice(2) : apenasNumeros;
             const formatadoSemDDI = semDDI.length === 11 ? `(${semDDI.slice(0,2)}) ${semDDI.slice(2,7)}-${semDDI.slice(7)}` : formatado;
 
+            console.log("Tentando buscar pelas opções:", { formatado, apenasNumeros, formatadoSemDDI, semDDI });
+
             try {
-                // Realiza uma busca flexível usando o operador 'ilike' ou testando as variações comuns na tabela alunos
                 let { data, error } = await supabaseClient
                     .from('alunos')
                     .select('*')
                     .or(`resp_tel.eq.${formatado},resp_tel.eq.${apenasNumeros},resp_tel.eq.${formatadoSemDDI},resp_tel.eq.${semDDI}`)
                     .maybeSingle();
 
+                console.log("Resposta do Supabase - Data:", data);
+                console.log("Resposta do Supabase - Error:", error);
+
                 if (error) {
                     console.error("Erro do Supabase:", error);
-                    errorText.textContent = "Erro ao conectar com o banco. Verifique o console.";
+                    errorText.textContent = "Erro ao conectar com o banco. Verifique o console (F12).";
                     errorMsgContainer.classList.remove('hidden');
                     return;
                 }
