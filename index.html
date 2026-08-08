@@ -39,9 +39,9 @@
         <div class="text-center flex flex-col items-center mb-8">
             <div class="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center mb-4">
                 <div class="absolute inset-0 rounded-full bg-gradient-to-tr from-lilas via-pink-400 to-rosa animate-spin-slow opacity-75 blur-sm"></div>
-                <div class="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white p-1.5 shadow-lg flex items-center justify-center animate-pulse-glow">
-                    <div class="w-full h-full bg-purple-50/50 rounded-full flex items-center justify-center overflow-hidden">
-                        <img src="logo.png" alt="Logo Dance Aleluia" class="w-20 h-20 object-contain drop-shadow">
+                <div class="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white p-3 shadow-lg flex items-center justify-center animate-pulse-glow">
+                    <div class="w-full h-full rounded-full flex items-center justify-center overflow-hidden">
+                        <img src="logo.png" alt="Logo Dance Aleluia" class="w-full h-full object-contain drop-shadow-sm">
                     </div>
                 </div>
             </div>
@@ -71,7 +71,7 @@
 
             <div id="error-msg" class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-sm text-center font-semibold hidden flex items-center justify-center gap-2">
                 <i class="fa-solid fa-triangle-exclamation"></i>
-                <span>Número não encontrado no sistema. Verifique os dígitos ou fale com a administração.</span>
+                <span id="error-text">Número não encontrado no sistema. Verifique os dígitos ou fale com a administração.</span>
             </div>
         </div>
 
@@ -123,7 +123,6 @@
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Garante que só entram números e trava em até 11 dígitos
         function validarNumeros(input) {
             let v = input.value.replace(/\D/g, "");
             if (v.length > 11) {
@@ -134,39 +133,55 @@
 
         async function buscarFatura() {
             const phone = document.getElementById('phone-input').value.trim();
-            const errorMsg = document.getElementById('error-msg');
+            const errorMsgContainer = document.getElementById('error-msg');
+            const errorText = document.getElementById('error-text');
             
             if (!phone || phone.length < 10) {
-                errorMsg.querySelector('span').textContent = "Por favor, digite um número de telefone válido (com DDD).";
-                errorMsg.classList.remove('hidden');
+                errorText.textContent = "Por favor, digite um número de telefone válido (com DDD).";
+                errorMsgContainer.classList.remove('hidden');
                 return;
             }
 
-            const { data, error } = await supabaseClient
-                .from('faturas')
-                .select('*')
-                .eq('resp_tel', phone)
-                .single();
+            try {
+                // ATENÇÃO: Verifique se o nome da sua tabela no Supabase é realmente 'faturas'
+                const { data, error } = await supabaseClient
+                    .from('faturas')
+                    .select('*')
+                    .eq('resp_tel', phone)
+                    .maybeSingle(); // Usamos maybeSingle para não dar erro se não achar
 
-            if (error || !data) {
-                errorMsg.querySelector('span').textContent = "Número não encontrado no sistema. Verifique os dígitos ou fale com a administração.";
-                errorMsg.classList.remove('hidden');
-                return;
+                if (error) {
+                    console.error("Erro do Supabase:", error);
+                    errorText.textContent = "Erro ao conectar com o banco. Verifique o console.";
+                    errorMsgContainer.classList.remove('hidden');
+                    return;
+                }
+
+                if (!data) {
+                    errorText.textContent = "Número não encontrado no sistema. Verifique os dígitos.";
+                    errorMsgContainer.classList.remove('hidden');
+                    return;
+                }
+
+                errorMsgContainer.classList.add('hidden');
+                
+                document.getElementById('resp-name').textContent = data.resp_nome || "Responsável";
+                if(data.valor) {
+                    document.getElementById('fatura-valor').textContent = `R$ ${Number(data.valor).toFixed(2).replace('.', ',')}`;
+                }
+
+                const numeroZap = "5571982119267";
+                const textoMensagem = encodeURIComponent("Olá acabei de efetuar o pagamento!\nsegue o comprovante");
+                document.getElementById('whatsapp-btn').href = `https://wa.me/${numeroZap}?text=${textoMensagem}`;
+
+                document.getElementById('step-search').classList.add('hidden');
+                document.getElementById('step-payment').classList.remove('hidden');
+
+            } catch (err) {
+                console.error("Erro inesperado:", err);
+                errorText.textContent = "Ocorreu um erro inesperado na consulta.";
+                errorMsgContainer.classList.remove('hidden');
             }
-
-            errorMsg.classList.add('hidden');
-            
-            document.getElementById('resp-name').textContent = data.resp_nome || "Responsável";
-            if(data.valor) {
-                document.getElementById('fatura-valor').textContent = `R$ ${Number(data.valor).toFixed(2).replace('.', ',')}`;
-            }
-
-            const numeroZap = "5571982119267";
-            const textoMensagem = encodeURIComponent("Olá acabei de efetuar o pagamento!\nsegue o comprovante");
-            document.getElementById('whatsapp-btn').href = `https://wa.me/${numeroZap}?text=${textoMensagem}`;
-
-            document.getElementById('step-search').classList.add('hidden');
-            document.getElementById('step-payment').classList.remove('hidden');
         }
 
         function copiarPix() {
