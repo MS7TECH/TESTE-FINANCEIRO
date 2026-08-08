@@ -156,24 +156,17 @@
                 formatado = `(${apenasNumeros.slice(0,2)}) ${apenasNumeros.slice(2,6)}-${apenasNumeros.slice(6)}`;
             }
 
+            // Variações extras para garantir que encontre independentemente de espaços ou traços salvos no banco
+            const semDDI = apenasNumeros.startsWith("55") ? apenasNumeros.slice(2) : apenasNumeros;
+            const formatadoSemDDI = semDDI.length === 11 ? `(${semDDI.slice(0,2)}) ${semDDI.slice(2,7)}-${semDDI.slice(7)}` : formatado;
+
             try {
-                // Tenta buscar pelo formato com máscara
+                // Realiza uma busca flexível usando o operador 'ilike' ou testando as variações comuns na tabela alunos
                 let { data, error } = await supabaseClient
                     .from('alunos')
                     .select('*')
-                    .eq('resp_tel', formatado)
+                    .or(`resp_tel.eq.${formatado},resp_tel.eq.${apenasNumeros},resp_tel.eq.${formatadoSemDDI},resp_tel.eq.${semDDI}`)
                     .maybeSingle();
-
-                // Se não achar, tenta buscar apenas com os números limpos
-                if (!data) {
-                    const resAlt = await supabaseClient
-                        .from('alunos')
-                        .select('*')
-                        .eq('resp_tel', apenasNumeros)
-                        .maybeSingle();
-                    data = resAlt.data;
-                    error = resAlt.error;
-                }
 
                 if (error) {
                     console.error("Erro do Supabase:", error);
@@ -193,7 +186,6 @@
                 const nomeExibicao = data.resp_nome ? `${data.resp_nome} (${data.nome})` : data.nome;
                 document.getElementById('resp-name').textContent = nomeExibicao || "Cliente";
 
-                // Puxa o valor da mensalidade direto do campo valor_mensalidade do banco
                 const valorMensalidade = data.valor_mensalidade ? Number(data.valor_mensalidade) : 150.00;
                 document.getElementById('fatura-valor').textContent = `R$ ${valorMensalidade.toFixed(2).replace('.', ',')}`;
 
