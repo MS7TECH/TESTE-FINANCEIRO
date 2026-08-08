@@ -55,12 +55,12 @@
             </div>
 
             <div class="space-y-2">
-                <label class="block text-sm font-bold text-gray-700">Telefone (Apenas números, máximo 11 dígitos)</label>
+                <label class="block text-sm font-bold text-gray-700">Telefone</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400">
                         <i class="fa-solid fa-phone"></i>
                     </span>
-                    <input type="tel" id="phone-input" maxlength="11" placeholder="71999999999" oninput="validarNumeros(this)" class="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-purple-100 focus:outline-none focus:border-lilas focus:ring-4 focus:ring-purple-100 text-gray-800 text-lg transition duration-200">
+                    <input type="tel" id="phone-input" maxlength="15" placeholder="(71) 99999-9999" oninput="aplicarMascaraTelefone(this)" class="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-purple-100 focus:outline-none focus:border-lilas focus:ring-4 focus:ring-purple-100 text-gray-800 text-lg transition duration-200">
                 </div>
             </div>
 
@@ -123,10 +123,17 @@
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        function validarNumeros(input) {
+        // Aplica a máscara (00) 00000-0000 enquanto o usuário digita apenas números
+        function aplicarMascaraTelefone(input) {
             let v = input.value.replace(/\D/g, "");
-            if (v.length > 11) {
-                v = v.slice(0, 11);
+            if (v.length > 11) v = v.slice(0, 11);
+
+            if (v.length > 6) {
+                v = v.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, "($1) $2-$3");
+            } else if (v.length > 2) {
+                v = v.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+            } else if (v.length > 0) {
+                v = v.replace(/^(\d*)/, "($1");
             }
             input.value = v;
         }
@@ -136,14 +143,15 @@
             const errorMsgContainer = document.getElementById('error-msg');
             const errorText = document.getElementById('error-text');
             
-            if (!phone || phone.length < 10) {
-                errorText.textContent = "Por favor, digite um número de telefone válido (com DDD).";
+            // Verifica se tem o formato mínimo preenchido (ex: (71) 99999-9999 tem 15 caracteres)
+            if (!phone || phone.length < 14) {
+                errorText.textContent = "Por favor, digite o número de telefone completo com DDD.";
                 errorMsgContainer.classList.remove('hidden');
                 return;
             }
 
             try {
-                // CORRIGIDO: Busca na tabela correta 'alunos' do seu sistema
+                // Faz a consulta usando exatamente o formato formatado que está no banco
                 const { data, error } = await supabaseClient
                     .from('alunos')
                     .select('*')
@@ -165,7 +173,6 @@
 
                 errorMsgContainer.classList.add('hidden');
                 
-                // Exibe o nome do responsável e da aluna de forma amigável
                 const nomeExibicao = data.resp_nome ? `${data.resp_nome} (${data.nome})` : data.nome;
                 document.getElementById('resp-name').textContent = nomeExibicao || "Cliente";
 
