@@ -93,18 +93,17 @@
 
             <div class="space-y-2">
                 <label class="block text-sm font-bold text-gray-700 flex items-center gap-2">
-                    <i class="fa-solid fa-qrcode text-lilas"></i> Chave Pix (CNPJ)
+                    <i class="fa-solid fa-qrcode text-lilas"></i> PIX Cópia e Cola
                 </label>
                 <div class="flex items-center gap-2">
-                    <input type="text" id="pix-key" readonly value="45.542.397/0001-81" class="w-full px-4 py-3 text-sm bg-gray-50 rounded-xl border-2 border-gray-200 text-gray-800 font-mono select-all font-semibold">
-                    <button onclick="copiarPix()" class="bg-rosa hover:bg-rosaHover text-white px-5 py-3 rounded-xl font-bold transition shadow-md flex items-center justify-center">
+                    <input type="text" id="pix-payload" readonly class="w-full px-4 py-3 text-xs bg-gray-50 rounded-xl border-2 border-gray-200 text-gray-700 font-mono select-all overflow-x-auto" placeholder="Gerando PIX...">
+                    <button onclick="copiarPix()" class="bg-rosa hover:bg-rosaHover text-white px-5 py-3 rounded-xl font-bold transition shadow-md flex items-center justify-center whitespace-nowrap">
                         <i class="fa-solid fa-copy text-base"></i>
                     </button>
                 </div>
-                <input type="hidden" id="pix-payload-oculto" value="">
                 
                 <p id="copy-feedback" class="text-xs text-emerald-600 text-center font-bold bg-emerald-50 py-1.5 rounded-lg hidden">
-                    <i class="fa-solid fa-check"></i> Pix Copia e Cola gerado com sucesso!
+                    <i class="fa-solid fa-check"></i> PIX copiado com sucesso! Cole no seu banco.
                 </p>
             </div>
 
@@ -139,13 +138,48 @@
             input.value = v;
         }
 
-        // Função auxiliar para calcular o CRC16 do Pix caso necessário, ou gerar o payload padrão formatado com o valor
-        function gerarPayloadPix(valorNumerico) {
-            const cnpjLimpo = "45542397000181"; // Sem pontuação para o payload
-            const valorFormatado = Number(valorNumerico).toFixed(2);
+        // ✅ FUNÇÃO PARA CALCULAR CRC16 (NOVO!)
+        function calcularCRC16(str) {
+            let crc = 0xFFFF;
             
-            // Monta o payload EMV padrão do Banco Central com o CNPJ e o valor dinâmico
-            return `00020126360014br.gov.bcb.pix0114+55${cnpjLimpo}5204000053039865802BR5925DANCE ALELUIA SISTEMA6009SAO SALVADOR62070503***6304`;
+            for (let i = 0; i < str.length; i++) {
+                crc ^= str.charCodeAt(i) << 8;
+                
+                for (let j = 0; j < 8; j++) {
+                    crc <<= 1;
+                    if (crc & 0x10000) {
+                        crc ^= 0x1021;
+                    }
+                }
+            }
+            
+            return (crc & 0xFFFF).toString(16).padStart(4, '0').toUpperCase();
+        }
+
+        // ✅ FUNÇÃO PARA GERAR PIX COM VALOR DINÂMICO (CORRIGIDA!)
+        function gerarPayloadPix(valorNumerico) {
+            const cnpj = "45542397000181"; // CNPJ sem formatação
+            const valor = Number(valorNumerico).toFixed(2);
+            const nomeEscola = "DANCE ALELUIA";
+            const cidade = "SAO SALVADOR";
+
+            // Monta o payload EMV QR Code sem o checksum
+            let payload = "00020126360014br.gov.bcb.pix0114" +
+                          cnpj +
+                          "5204000053039865406" + 
+                          valor +
+                          "5802BR5913" +
+                          nomeEscola.padEnd(25) +
+                          "6009" +
+                          cidade +
+                          "62070503***63041D3D";
+
+            // Remove o "1D3D" temporário e calcula o CRC real
+            payload = payload.slice(0, -4); // Remove "1D3D"
+            const crc = calcularCRC16(payload);
+            
+            // Retorna o payload completo com CRC correto
+            return payload + crc;
         }
 
         async function buscarFatura() {
@@ -202,9 +236,13 @@
                 const valorMensalidade = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 0.00;
                 document.getElementById('fatura-valor').textContent = `R$ ${valorMensalidade.toFixed(2).replace('.', ',')}`;
 
-                // Configura o payload dinâmico com base no valor da aluna para o botão de copiar
+                // ✅ GERA O PAYLOAD COM VALOR DINÂMICO E CRC CORRETO
                 const payloadGerado = gerarPayloadPix(valorMensalidade);
-                document.getElementById('pix-payload-oculto').value = payloadGerado;
+                document.getElementById('pix-payload').value = payloadGerado;
+
+                // Log para debug (remove depois)
+                console.log("PIX Gerado:", payloadGerado);
+                console.log("Valor:", valorMensalidade);
 
                 const numeroZap = "5571982119267";
                 const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${alunoEncontrado.nome}\nValor: R$ ${valorMensalidade.toFixed(2).replace('.', ',')}\nSegue o comprovante.`);
@@ -221,16 +259,19 @@
         }
 
         function copiarPix() {
-            // Pega o payload completo gerado com o valor dinâmico para copiar ao invés de só o CNPJ puro
-            const payload = document.getElementById('pix-payload-oculto').value;
-            const chaveVisual = document.getElementById('pix-key');
+            const payload = document.getElementById('pix-payload').value;
             
-            const textoParaCopiar = payload ? payload : chaveVisual.value;
+            if (!payload) {
+                alert("PIX não foi gerado. Tente novamente.");
+                return;
+            }
 
-            navigator.clipboard.writeText(textoParaCopiar).then(() => {
+            navigator.clipboard.writeText(payload).then(() => {
                 const feedback = document.getElementById('copy-feedback');
                 feedback.classList.remove('hidden');
                 setTimeout(() => feedback.classList.add('hidden'), 3000);
+            }).catch(() => {
+                alert("Erro ao copiar. Selecione manualmente o texto.");
             });
         }
 
