@@ -87,7 +87,7 @@
                 </div>
                 <div class="flex justify-between items-center pt-1">
                     <span class="text-base font-bold text-gray-700">Valor Atualizado:</span>
-                    <span id="fatura-valor" class="text-3xl font-extrabold text-rosa">R$ 350,00</span>
+                    <span id="fatura-valor" class="text-3xl font-extrabold text-rosa">R$ 0,00</span>
                 </div>
             </div>
 
@@ -188,11 +188,12 @@
                 const nomeExibicao = alunoEncontrado.resp_nome ? `${alunoEncontrado.resp_nome} (${alunoEncontrado.nome})` : alunoEncontrado.nome;
                 document.getElementById('resp-name').textContent = nomeExibicao || "Cliente";
 
-                const valorMensalidade = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 150.00;
+                // Pega o valor específico cadastrado no banco para este aluno
+                const valorMensalidade = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 0.00;
                 document.getElementById('fatura-valor').textContent = `R$ ${valorMensalidade.toFixed(2).replace('.', ',')}`;
 
                 const numeroZap = "5571982119267";
-                const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${alunoEncontrado.nome}\nSegue o comprovante.`);
+                const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${alunoEncontrado.nome}\nValor: R$ ${valorMensalidade.toFixed(2).replace('.', ',')}\nSegue o comprovante.`);
                 document.getElementById('whatsapp-btn').href = `https://wa.me/${numeroZap}?text=${textoMensagem}`;
 
                 document.getElementById('step-search').classList.add('hidden');
