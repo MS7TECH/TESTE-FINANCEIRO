@@ -148,37 +148,36 @@
                 return;
             }
 
-            const apenasNumeros = phoneInputRaw.replace(/\D/g, "");
-            let formatado = apenasNumeros;
-            if (apenasNumeros.length === 11) {
-                formatado = `(${apenasNumeros.slice(0,2)}) ${apenasNumeros.slice(2,7)}-${apenasNumeros.slice(7)}`;
-            } else if (apenasNumeros.length === 10) {
-                formatado = `(${apenasNumeros.slice(0,2)}) ${apenasNumeros.slice(2,6)}-${apenasNumeros.slice(6)}`;
-            }
-
-            const semDDI = apenasNumeros.startsWith("55") ? apenasNumeros.slice(2) : apenasNumeros;
-            const formatadoSemDDI = semDDI.length === 11 ? `(${semDDI.slice(0,2)}) ${semDDI.slice(2,7)}-${semDDI.slice(7)}` : formatado;
-
-            console.log("Tentando buscar pelas opções:", { formatado, apenasNumeros, formatadoSemDDI, semDDI });
+            const numerosDigitados = phoneInputRaw.replace(/\D/g, "");
 
             try {
-                let { data, error } = await supabaseClient
+                const { data: alunos, error } = await supabaseClient
                     .from('alunos')
-                    .select('*')
-                    .or(`resp_tel.eq.${formatado},resp_tel.eq.${apenasNumeros},resp_tel.eq.${formatadoSemDDI},resp_tel.eq.${semDDI}`)
-                    .maybeSingle();
-
-                console.log("Resposta do Supabase - Data:", data);
-                console.log("Resposta do Supabase - Error:", error);
+                    .select('*');
 
                 if (error) {
                     console.error("Erro do Supabase:", error);
-                    errorText.textContent = "Erro ao conectar com o banco. Verifique o console (F12).";
+                    errorText.textContent = "Erro ao conectar com o banco. Verifique o console.";
                     errorMsgContainer.classList.remove('hidden');
                     return;
                 }
 
-                if (!data) {
+                if (!alunos || alunos.length === 0) {
+                    errorText.textContent = "Nenhum aluno cadastrado na base de dados.";
+                    errorMsgContainer.classList.remove('hidden');
+                    return;
+                }
+
+                const alunoEncontrado = alunos.find(aluno => {
+                    if (!aluno.resp_tel) return false;
+                    const numerosBanco = String(aluno.resp_tel).replace(/\D/g, "");
+                    
+                    return numerosBanco === numerosDigitados || 
+                           numerosBanco.endsWith(numerosDigitados) || 
+                           numerosDigitados.endsWith(numerosBanco);
+                });
+
+                if (!alunoEncontrado) {
                     errorText.textContent = "Número não encontrado no sistema. Verifique os dígitos.";
                     errorMsgContainer.classList.remove('hidden');
                     return;
@@ -186,14 +185,14 @@
 
                 errorMsgContainer.classList.add('hidden');
                 
-                const nomeExibicao = data.resp_nome ? `${data.resp_nome} (${data.nome})` : data.nome;
+                const nomeExibicao = alunoEncontrado.resp_nome ? `${alunoEncontrado.resp_nome} (${alunoEncontrado.nome})` : alunoEncontrado.nome;
                 document.getElementById('resp-name').textContent = nomeExibicao || "Cliente";
 
-                const valorMensalidade = data.valor_mensalidade ? Number(data.valor_mensalidade) : 150.00;
+                const valorMensalidade = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 150.00;
                 document.getElementById('fatura-valor').textContent = `R$ ${valorMensalidade.toFixed(2).replace('.', ',')}`;
 
                 const numeroZap = "5571982119267";
-                const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${data.nome}\nSegue o comprovante.`);
+                const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${alunoEncontrado.nome}\nSegue o comprovante.`);
                 document.getElementById('whatsapp-btn').href = `https://wa.me/${numeroZap}?text=${textoMensagem}`;
 
                 document.getElementById('step-search').classList.add('hidden');
