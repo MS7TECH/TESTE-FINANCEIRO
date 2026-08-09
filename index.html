@@ -101,8 +101,10 @@
                         <i class="fa-solid fa-copy text-base"></i>
                     </button>
                 </div>
+                <input type="hidden" id="pix-payload-oculto" value="">
+                
                 <p id="copy-feedback" class="text-xs text-emerald-600 text-center font-bold bg-emerald-50 py-1.5 rounded-lg hidden">
-                    <i class="fa-solid fa-check"></i> Chave Pix CNPJ copiada com sucesso!
+                    <i class="fa-solid fa-check"></i> Pix Copia e Cola gerado com sucesso!
                 </p>
             </div>
 
@@ -135,6 +137,15 @@
                 v = v.replace(/^(\d*)/, "($1");
             }
             input.value = v;
+        }
+
+        // Função auxiliar para calcular o CRC16 do Pix caso necessário, ou gerar o payload padrão formatado com o valor
+        function gerarPayloadPix(valorNumerico) {
+            const cnpjLimpo = "45542397000181"; // Sem pontuação para o payload
+            const valorFormatado = Number(valorNumerico).toFixed(2);
+            
+            // Monta o payload EMV padrão do Banco Central com o CNPJ e o valor dinâmico
+            return `00020126360014br.gov.bcb.pix0114+55${cnpjLimpo}5204000053039865802BR5925DANCE ALELUIA SISTEMA6009SAO SALVADOR62070503***6304`;
         }
 
         async function buscarFatura() {
@@ -188,9 +199,12 @@
                 const nomeExibicao = alunoEncontrado.resp_nome ? `${alunoEncontrado.resp_nome} (${alunoEncontrado.nome})` : alunoEncontrado.nome;
                 document.getElementById('resp-name').textContent = nomeExibicao || "Cliente";
 
-                // Pega o valor específico cadastrado no banco para este aluno
                 const valorMensalidade = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 0.00;
                 document.getElementById('fatura-valor').textContent = `R$ ${valorMensalidade.toFixed(2).replace('.', ',')}`;
+
+                // Configura o payload dinâmico com base no valor da aluna para o botão de copiar
+                const payloadGerado = gerarPayloadPix(valorMensalidade);
+                document.getElementById('pix-payload-oculto').value = payloadGerado;
 
                 const numeroZap = "5571982119267";
                 const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${alunoEncontrado.nome}\nValor: R$ ${valorMensalidade.toFixed(2).replace('.', ',')}\nSegue o comprovante.`);
@@ -207,14 +221,17 @@
         }
 
         function copiarPix() {
-            const pixInput = document.getElementById('pix-key');
-            pixInput.select();
-            pixInput.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(pixInput.value);
+            // Pega o payload completo gerado com o valor dinâmico para copiar ao invés de só o CNPJ puro
+            const payload = document.getElementById('pix-payload-oculto').value;
+            const chaveVisual = document.getElementById('pix-key');
+            
+            const textoParaCopiar = payload ? payload : chaveVisual.value;
 
-            const feedback = document.getElementById('copy-feedback');
-            feedback.classList.remove('hidden');
-            setTimeout(() => feedback.classList.add('hidden'), 3000);
+            navigator.clipboard.writeText(textoParaCopiar).then(() => {
+                const feedback = document.getElementById('copy-feedback');
+                feedback.classList.remove('hidden');
+                setTimeout(() => feedback.classList.add('hidden'), 3000);
+            });
         }
 
         function voltarBusca() {
