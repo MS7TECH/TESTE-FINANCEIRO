@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -99,9 +98,8 @@
                 </label>
                 
                 <div class="flex justify-center">
-                    <div id="qrcode-container" class="bg-white p-4 rounded-2xl shadow-lg border-2 border-purple-100">
-                        <!-- QR Code será gerado aqui -->
-                    </div>
+                    <div id="qrcode-container" class="bg-white p-4 rounded-2xl shadow-lg border-2 border-purple-100 flex items-center justify-center" style="min-width: 250px; min-height: 250px;">
+                        </div>
                 </div>
 
                 <p class="text-xs text-gray-500 text-center">
@@ -110,7 +108,6 @@
                 </p>
             </div>
 
-            <!-- Opção de Cópia e Cola (fallback) -->
             <details class="text-xs">
                 <summary class="cursor-pointer text-gray-500 hover:text-lilas font-semibold text-center block">
                     <i class="fa-solid fa-chevron-down inline"></i> Não consegue scanear? Use cópia e cola
@@ -137,13 +134,15 @@
 
     </div>
 
-    <script>
+    <script type="module">
+        import { QrCodePix } from 'https://cdn.jsdelivr.net/npm/qrcode-pix/+esm';
+
         const SUPABASE_URL = 'https://lnuhvtptctbvddxgltvd.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_bKYN3aRSABe_fDeNpjrKxw_ePjSGolj';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        function aplicarMascaraTelefone(input) {
+        window.aplicarMascaraTelefone = function(input) {
             let v = input.value.replace(/\D/g, "");
             if (v.length > 11) v = v.slice(0, 11);
 
@@ -157,148 +156,44 @@
             input.value = v;
         }
 
-        /**
-         * ✅ FUNÇÃO PARA CALCULAR CRC16 - Padrão oficial BC
-         * Polinômio: 0x1021, C.I. 0xFFFF (conforme Manual do BC)
-         */
-        function calcularCRC16(str) {
-            let crc = 0xFFFF;
-            
-            for (let i = 0; i < str.length; i++) {
-                crc ^= (str.charCodeAt(i) << 8);
-                
-                for (let j = 0; j < 8; j++) {
-                    crc <<= 1;
-                    if (crc & 0x10000) {
-                        crc ^= 0x1021;
-                    }
-                }
-            }
-            
-            return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-        }
+        async function gerarQRCode(valor) {
+            const valorNumerico = parseFloat(valor);
 
-        /**
-         * ✅ FUNÇÃO PARA GERAR PIX ESTÁTICO - Conforme padrão BC
-         * Formato: ID(2) + Tamanho(2) + Dados + ... + CRC16(4)
-         */
-        function gerarPixEstatico(cnpj, valor) {
-            // CNPJ sem formatação
-            const cnpjLimpo = cnpj.replace(/\D/g, '');
-            
-            // Valor com 2 casas decimais
-            const valorFormatado = parseFloat(valor).toFixed(2);
-            
-            // ========================================
-            // ID 26-51: Merchant Account Information
-            // ========================================
-            // ID 00: GUI (br.gov.bcb.pix)
-            const GUI = 'br.gov.bcb.pix';
-            const guiId = '00' + String(GUI.length).padStart(2, '0') + GUI;
-            
-            // ID 01: Chave PIX (CNPJ)
-            const pixChave = cnpjLimpo;
-            const chaveId = '01' + String(pixChave.length).padStart(2, '0') + pixChave;
-            
-            // Merchant Account Information (ID 26)
-            const merchantInfo = '26' + String((guiId + chaveId).length).padStart(2, '0') + guiId + chaveId;
-            
-            // ========================================
-            // ID 52: Merchant Category Code (MCC)
-            // ========================================
-            const mcc = '5204';
-            const mccId = mcc + '0000';
-            
-            // ========================================
-            // ID 53: Transaction Currency Code
-            // ========================================
-            const currency = '5303986'; // 986 = BRL
-            
-            // ========================================
-            // ID 54: Transaction Amount (Valor)
-            // ========================================
-            const amountId = '54' + String(valorFormatado.length).padStart(2, '0') + valorFormatado;
-            
-            // ========================================
-            // ID 58: Country Code (Brasil = BR)
-            // ========================================
-            const countryCode = '5802BR';
-            
-            // ========================================
-            // ID 59: Merchant Name (Nome do recebedor)
-            // ========================================
-            const merchantName = 'DANCE ALELUIA';
-            const nameId = '59' + String(merchantName.length).padStart(2, '0') + merchantName;
-            
-            // ========================================
-            // ID 60: Merchant City (Cidade)
-            // ========================================
-            const city = 'SAO SALVADOR';
-            const cityId = '60' + String(city.length).padStart(2, '0') + city;
-            
-            // ========================================
-            // ID 62: Additional Data Field (Referência)
-            // ========================================
-            const reference = '***'; // Referência fixa
-            const refId = '62' + String(('05' + String(reference.length).padStart(2, '0') + reference).length).padStart(2, '0') + '05' + String(reference.length).padStart(2, '0') + reference;
-            
-            // ========================================
-            // Monta string SEM o CRC (63)
-            // ========================================
-            let pixSemCrc = '0002' +  // Payload Format Indicator
-                            '0126' +  // Point of Initiation Method (01 = Static, 02 = Dynamic)
-                            merchantInfo +
-                            mccId +
-                            currency +
-                            amountId +
-                            countryCode +
-                            nameId +
-                            cityId +
-                            refId;
-            
-            // ========================================
-            // Calcula CRC16
-            // ========================================
-            const crc = calcularCRC16(pixSemCrc);
-            
-            // ========================================
-            // PIX FINAL com CRC
-            // ========================================
-            const pixFinal = pixSemCrc + '6304' + crc;
-            
-            return pixFinal;
-        }
+            // Bloco oficial e blindado utilizando a biblioteca qrcode-pix
+            const qrCodePix = QrCodePix({
+                version: '01',
+                key: '45542397000181',              // CNPJ correto
+                name: 'JOYCE ALELUIA DOS SANTOS',    // Nome exato da titular
+                city: 'SALVADOR BAHIA',              // Cidade correta
+                value: valorNumerico,                // Valor obtido do Supabase
+                transactionId: '***'                 // Identificador da transação
+            });
 
-        /**
-         * ✅ FUNÇÃO PARA GERAR QR CODE
-         */
-        function gerarQRCode(valor) {
-            const pixPayload = gerarPixEstatico('45542397000181', valor);
+            // Extrai o payload padrão Banco Central para o Copia e Cola
+            const pixPayload = qrCodePix.payload();
             
-            // Limpa QR anterior
+            // Limpa o contentor anterior
             const container = document.getElementById('qrcode-container');
             container.innerHTML = '';
             
-            // Gera novo QR
-            new QRCode(container, {
-                text: pixPayload,
-                width: 250,
-                height: 250,
-                colorDark: "#7c3aed",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
+            // Gera a imagem do QR Code em Base64
+            const qrCodeImageBase64 = await qrCodePix.base64();
+            
+            const img = document.createElement('img');
+            img.src = qrCodeImageBase64;
+            img.alt = 'QR Code Pix';
+            img.style.width = '250px';
+            img.style.height = '250px';
+            container.appendChild(img);
 
-            // Também salva para fallback de cópia e cola
+            // Guarda o payload no input do Copia e Cola
             document.getElementById('pix-payload').value = pixPayload;
             
-            console.log("✅ PIX Estático Gerado (Padrão BC):");
-            console.log("Valor:", valor);
+            console.log("✅ PIX Gerado com Sucesso via qrcode-pix!");
             console.log("Payload:", pixPayload);
-            console.log("Tamanho:", pixPayload.length);
         }
 
-        async function buscarFatura() {
+        window.buscarFatura = async function() {
             const phoneInputRaw = document.getElementById('phone-input').value.trim();
             const errorMsgContainer = document.getElementById('error-msg');
             const errorText = document.getElementById('error-text');
@@ -352,8 +247,8 @@
                 const valorMensalidade = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 0.00;
                 document.getElementById('fatura-valor').textContent = `R$ ${valorMensalidade.toFixed(2).replace('.', ',')}`;
 
-                // ✅ GERA O QR CODE + PIX CÓPIA E COLA
-                gerarQRCode(valorMensalidade);
+                // Gera o QR Code integrado
+                await gerarQRCode(valorMensalidade);
 
                 const numeroZap = "5571982119267";
                 const textoMensagem = encodeURIComponent(`Olá, acabei de efetuar o pagamento!\nAluna: ${alunoEncontrado.nome}\nValor: R$ ${valorMensalidade.toFixed(2).replace('.', ',')}\nSegue o comprovante.`);
@@ -369,7 +264,7 @@
             }
         }
 
-        function copiarPix() {
+        window.copiarPix = function() {
             const payload = document.getElementById('pix-payload').value;
             
             if (!payload) {
@@ -386,7 +281,7 @@
             });
         }
 
-        function voltarBusca() {
+        window.voltarBusca = function() {
             document.getElementById('step-payment').classList.add('hidden');
             document.getElementById('step-search').classList.remove('hidden');
             document.getElementById('phone-input').value = '';
