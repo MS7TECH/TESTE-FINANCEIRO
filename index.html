@@ -184,7 +184,7 @@
                 key: '45542397000181',              // CNPJ correto
                 name: 'JOYCE ALELUIA DOS SANTOS',    // Nome exato da titular
                 city: 'SALVADOR BAHIA',              // Cidade correta
-                value: valorNumerico,                // Valor calculado (com multas/juros se houver)
+                value: valorNumerico,                // Valor calculado
                 transactionId: '***'
             });
 
@@ -227,12 +227,18 @@
                     return;
                 }
 
+                // BUSCA SEGURA CORRIGIDA
                 const alunoEncontrado = alunos.find(aluno => {
                     if (!aluno.resp_tel) return false;
                     const numerosBanco = String(aluno.resp_tel).replace(/\D/g, "");
+                    
+                    // Trava de segurança: ignora registros com números incompletos ou vazios no banco
+                    if (numerosBanco.length < 8) return false; 
+
+                    // Comparação: verifica se o número digitado bate com o final do número cadastrado
+                    // Isso ajuda a encontrar o número mesmo que no banco esteja salvo sem DDI
                     return numerosBanco === numerosDigitados || 
-                           numerosBanco.endsWith(numerosDigitados) || 
-                           numerosDigitados.endsWith(numerosBanco);
+                           numerosBanco.endsWith(numerosDigitados);
                 });
 
                 if (!alunoEncontrado) {
@@ -241,10 +247,8 @@
                     return;
                 }
 
-                // Descobre o mês de referência atual
                 const mesAtualNome = MONTHS[new Date().getMonth()];
 
-                // Verifica se já existe pagamento registrado na tabela mensalidades
                 const { data: pagamentoExistente } = await supabaseClient
                     .from('mensalidades')
                     .select('*')
@@ -255,13 +259,11 @@
                 errorMsgContainer.classList.add('hidden');
                 document.getElementById('step-search').classList.add('hidden');
 
-                // SE JÁ ESTIVER PAGO, MOSTRA A TELA DE BLOQUEIO DE PAGAMENTO DUPLICADO
                 if (pagamentoExistente && pagamentoExistente.status === 'Pago') {
                     document.getElementById('step-already-paid').classList.remove('hidden');
                     return;
                 }
 
-                // CASO CONTRÁRIO, CALCULA OS VALORES COM MULTA (2%) E JUROS (1% A.M.)
                 const valorBase = alunoEncontrado.valor_mensalidade ? Number(alunoEncontrado.valor_mensalidade) : 0.00;
                 const diaVenc = alunoEncontrado.dia_vencimento || 2;
                 
@@ -276,8 +278,8 @@
 
                 if (hoje > vencimento) {
                     const diasAtraso = Math.floor((hoje.getTime() - vencimento.getTime()) / (1000 * 60 * 60 * 24));
-                    const multa = valorBase * 0.02; // 2% multa moratória
-                    const juros = valorBase * (0.01 / 30) * diasAtraso; // 1% ao mês proporcional por dia
+                    const multa = valorBase * 0.02;
+                    const juros = valorBase * (0.01 / 30) * diasAtraso;
                     valorTotalFinal = valorBase + multa + juros;
                     infoAtrasoTexto = `Atrasado (${diasAtraso} dias - Multa 2% e Juros 1% a.m. inclusos)`;
                 }
