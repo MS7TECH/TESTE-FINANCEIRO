@@ -181,9 +181,9 @@
 
             const qrCodePix = QrCodePix({
                 version: '01',
-                key: '45542397000181',              // CNPJ correto
+                key: '45542397000181',            // CNPJ correto
                 name: 'JOYCE ALELUIA DOS SANTOS',    // Nome exato da titular
-                city: 'SALVADOR BAHIA',              // Cidade correta
+                city: 'SALVADOR BAHIA',             // Cidade correta
                 value: valorNumerico,                // Valor calculado
                 transactionId: '***'
             });
@@ -227,18 +227,20 @@
                     return;
                 }
 
-                // BUSCA SEGURA CORRIGIDA
+                // BUSCA ROBUSTA CORRIGIDA: Verifica resp_tel E numero, ignorando formatação/máscaras
                 const alunoEncontrado = alunos.find(aluno => {
-                    if (!aluno.resp_tel) return false;
-                    const numerosBanco = String(aluno.resp_tel).replace(/\D/g, "");
-                    
-                    // Trava de segurança: ignora registros com números incompletos ou vazios no banco
-                    if (numerosBanco.length < 8) return false; 
+                    const limpar = (str) => str ? String(str).replace(/\D/g, "") : "";
+                    const telResp = limpar(aluno.resp_tel);
+                    const telNum = limpar(aluno.numero);
 
-                    // Comparação: verifica se o número digitado bate com o final do número cadastrado
-                    // Isso ajuda a encontrar o número mesmo que no banco esteja salvo sem DDI
-                    return numerosBanco === numerosDigitados || 
-                           numerosBanco.endsWith(numerosDigitados);
+                    const validaMatch = (dbTel) => {
+                        if (dbTel.length < 8) return false;
+                        return dbTel === numerosDigitados || 
+                               dbTel.endsWith(numerosDigitados) || 
+                               numerosDigitados.endsWith(dbTel);
+                    };
+
+                    return validaMatch(telResp) || validaMatch(telNum);
                 });
 
                 if (!alunoEncontrado) {
